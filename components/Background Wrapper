@@ -1,0 +1,26 @@
+import React from 'react';
+
+const BACKGROUND_IMAGE = "https://cdn.discordapp.com/attachments/1029945835888320547/1459926900322336986/Copy_of_ftc_banner.png?ex=69650e61&is=6963bce1&hm=85553b47aa1d8ea1734a0ccae34b6394d721135553b6c67a7ac3c4903eb5a551";
+
+export default function BackgroundWrapper({ children }) {
+  return (
+    <div className="min-h-screen relative">
+      {/* Background Image */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: `url(${BACKGROUND_IMAGE})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+      {/* Dark Overlay */}
+      <div className="fixed inset-0 z-0 bg-black/85" />
+      {/* Content */}
+      <div className="relative z-10">
+        {children}
+      </div>
+    </div>
+  );
+}
