@@ -1,0 +1,274 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import { 
+  Plus, 
+  MapPin, 
+  Calendar, 
+  ChevronRight,
+  ArrowLeft,
+  Trash2
+} from 'lucide-react';
+
+export default function Events() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const verified = localStorage.getItem('ftc_team_verified');
+    if (verified !== '15337') {
+      navigate(createPageUrl('TeamVerify'));
+    }
+  }, [navigate]);
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    date: '',
+    description: ''
+  });
+
+  const queryClient = useQueryClient();
+
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => base44.entities.Event.list('-created_date'),
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: (data) => base44.entities.Event.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      setShowCreateDialog(false);
+      setFormData({ name: '', location: '', date: '', description: '' });
+    },
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: (eventId) => base44.entities.Event.delete(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    createEventMutation.mutate(formData);
+  };
+
+  return (
+    <BackgroundWrapper>
+      {/* Header */}
+      <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link to={createPageUrl('Home')} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back</span>
+            </Link>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+              <DialogTrigger asChild>
+                <Button className="bg-cyan-500 hover:bg-cyan-400 text-black font-medium rounded-xl">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Event
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                <DialogHeader>
+                  <DialogTitle>Create New Event</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                  <div>
+                    <Label className="text-zinc-400">Event Name</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                      placeholder="Regional Championship 2025"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400">Location</Label>
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                      placeholder="Convention Center"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400">Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400">Description</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                      placeholder="Event description..."
+                      rows={3}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-medium"
+                    disabled={createEventMutation.isPending}
+                  >
+                    {createEventMutation.isPending ? 'Creating...' : 'Create Event'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-2">
+            Select Event
+          </h1>
+          <p className="text-zinc-500 mb-12">Choose an event to start scouting</p>
+        </motion.div>
+
+        {/* Events List */}
+        <div>
+          {isLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-48 bg-zinc-900/50 rounded-2xl animate-pulse backdrop-blur-sm" />
+              ))}
+            </div>
+          ) : events.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AnimatePresence>
+                {events.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <EventCard event={event} onDelete={() => deleteEventMutation.mutate(event.id)} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-zinc-900/50 rounded-2xl border border-zinc-800 backdrop-blur-sm">
+              <p className="text-zinc-500 mb-4">No events created yet</p>
+              <Button 
+                onClick={() => setShowCreateDialog(true)}
+                variant="outline" 
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Your First Event
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </BackgroundWrapper>
+  );
+}
+
+function EventCard({ event, onDelete }) {
+  return (
+    <Card className="bg-zinc-900/50 border-zinc-800 hover:border-cyan-500/50 transition-all duration-300 overflow-hidden group backdrop-blur-sm">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">{event.name}</h3>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 -mr-2 -mt-2">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-white">Delete Event?</AlertDialogTitle>
+                <AlertDialogDescription className="text-zinc-400">
+                  This will permanently delete "{event.name}" and all associated scout data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={onDelete}
+                  className="bg-red-500 hover:bg-red-400 text-white"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+        
+        {event.description && (
+          <p className="text-zinc-500 text-sm mb-4 line-clamp-2">{event.description}</p>
+        )}
+        
+        <div className="space-y-2 mb-6">
+          {event.location && (
+            <div className="flex items-center gap-2 text-zinc-400 text-sm">
+              <MapPin className="h-4 w-4" />
+              <span>{event.location}</span>
+            </div>
+          )}
+          {event.date && (
+            <div className="flex items-center gap-2 text-zinc-400 text-sm">
+              <Calendar className="h-4 w-4" />
+              <span>{format(new Date(event.date + 'T00:00:00'), 'MMM d, yyyy')}</span>
+            </div>
+          )}
+        </div>
+        
+        <Link to={createPageUrl('EventDashboard') + `?eventId=${event.id}`}>
+          <Button className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-medium rounded-xl group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all">
+            Explore Event
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
