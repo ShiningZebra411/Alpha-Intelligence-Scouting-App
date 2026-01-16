@@ -1,0 +1,180 @@
+import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
+import { ClipboardList, Plus, Trophy, Gamepad2, Flag, Trash2, Pencil, ArrowUpDown, Clock, Hash } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+export default function RecentMatches({ matches, isLoading, eventId }) {
+  const queryClient = useQueryClient();
+  const [sortMode, setSortMode] = useState('recent'); // 'recent' or 'match_number'
+
+  const deleteMatchMutation = useMutation({
+    mutationFn: (matchId) => base44.entities.MatchScout.delete(matchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches', eventId] });
+    },
+  });
+
+  const sortedMatches = useMemo(() => {
+    if (sortMode === 'recent') {
+      return [...matches].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    } else {
+      // Sort by match number, then red before blue, then by team number
+      return [...matches].sort((a, b) => {
+        if (a.match_number !== b.match_number) return a.match_number - b.match_number;
+        if (a.alliance !== b.alliance) return a.alliance === 'red' ? -1 : 1;
+        return a.team_number - b.team_number;
+      });
+    }
+  }, [matches, sortMode]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 bg-zinc-900 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (matches.length === 0) {
+    return (
+      <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+        <CardContent className="py-12 text-center">
+          <ClipboardList className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+          <p className="text-zinc-400 mb-4">No matches scouted yet</p>
+          <Link to={createPageUrl('ScoutMatch') + `?eventId=${eventId}`}>
+            <Button className="bg-cyan-500 hover:bg-cyan-400 text-black">
+              <Plus className="h-4 w-4 mr-2" />
+              Scout First Match
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Sort Toggle */}
+      <div className="flex justify-end mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSortMode(sortMode === 'recent' ? 'match_number' : 'recent')}
+          className="bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"
+        >
+          {sortMode === 'recent' ? (
+            <><Clock className="h-4 w-4 mr-2" />Most Recent</>
+          ) : (
+            <><Hash className="h-4 w-4 mr-2" />By Match #</>
+          )}
+          <ArrowUpDown className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+
+      {sortedMatches.map((match, index) => (
+        <motion.div
+          key={match.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.05 }}
+        >
+          <Card className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-white ${
+                    match.alliance === 'red' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                  }`}>
+                    M{match.match_number}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold text-white">Team {match.team_number}</span>
+                      <Badge className={`${match.alliance === 'red' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {match.alliance}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <ScoreChip icon={Trophy} label="Auto" value={match.auto_score || 0} />
+                      <ScoreChip icon={Gamepad2} label="Teleop" value={match.teleop_score || 0} />
+                      <ScoreChip icon={Flag} label="End" value={match.endgame_score || 0} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-right mr-2">
+                    <p className="text-2xl font-bold text-cyan-400">{match.total_score || 0}</p>
+                    <p className="text-zinc-500 text-xs">Total</p>
+                  </div>
+                  <Link to={createPageUrl('EditScout') + `?eventId=${eventId}&matchId=${match.id}`}>
+                    <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-cyan-400 hover:bg-cyan-500/10">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white">Delete Scout?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-zinc-400">
+                          This will permanently delete the scout data for Match {match.match_number}, Team {match.team_number}.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => deleteMatchMutation.mutate(match.id)}
+                          className="bg-red-500 hover:bg-red-400 text-white"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+              {match.notes && (
+                <p className="text-zinc-500 text-sm mt-3 pt-3 border-t border-zinc-800 line-clamp-2">
+                  {match.notes}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function ScoreChip({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-center gap-1 text-zinc-500 text-xs">
+      <Icon className="h-3 w-3" />
+      <span>{label}:</span>
+      <span className="text-zinc-300">{value}</span>
+    </div>
+  );
+}
