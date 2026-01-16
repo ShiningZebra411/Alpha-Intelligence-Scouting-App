@@ -1,0 +1,147 @@
+{
+  "name": "MatchScout",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Reference to the event"
+    },
+    "match_number": {
+      "type": "number",
+      "description": "Match number"
+    },
+    "team_number": {
+      "type": "number",
+      "description": "Team number being scouted"
+    },
+    "alliance": {
+      "type": "string",
+      "enum": [
+        "red",
+        "blue"
+      ],
+      "description": "Alliance color"
+    },
+    "auto_leave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Robot left starting position in autonomous"
+    },
+    "auto_artifacts_scored": {
+      "type": "number",
+      "default": 0,
+      "description": "Artifacts classified in auto"
+    },
+    "auto_artifacts_overflow": {
+      "type": "number",
+      "default": 0,
+      "description": "Artifacts in overflow in auto"
+    },
+    "auto_patterns": {
+      "type": "number",
+      "default": 0,
+      "description": "Pattern matches (MOTIF) in auto"
+    },
+    "teleop_artifacts_scored": {
+      "type": "number",
+      "default": 0,
+      "description": "Artifacts classified in teleop"
+    },
+    "teleop_artifacts_overflow": {
+      "type": "number",
+      "default": 0,
+      "description": "Artifacts in overflow in teleop"
+    },
+    "teleop_depot_artifacts": {
+      "type": "number",
+      "default": 0,
+      "description": "Depot artifacts at end of teleop"
+    },
+    "teleop_patterns": {
+      "type": "number",
+      "default": 0,
+      "description": "Pattern matches (MOTIF) in teleop"
+    },
+    "teleop_cycles": {
+      "type": "number",
+      "default": 0,
+      "description": "Cycles completed in teleop"
+    },
+    "endgame_fully_in_base": {
+      "type": "boolean",
+      "default": false,
+      "description": "Robot fully in base zone"
+    },
+    "endgame_partially_in_base": {
+      "type": "boolean",
+      "default": false,
+      "description": "Robot partially in base zone"
+    },
+    "endgame_top_bot": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "top_bot",
+        "half_space"
+      ],
+      "default": "normal",
+      "description": "Endgame position type"
+    },
+    "auto_path": {
+      "type": "string",
+      "description": "JSON string of auto path drawing points"
+    },
+    "defense_rating": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Defense quality rating 1-5"
+    },
+    "driver_skill": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Driver skill rating 1-5"
+    },
+    "overall_rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50,
+      "description": "Overall team rating 0-100"
+    },
+    "reliability_rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50,
+      "description": "Reliability rating 0-100"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the match"
+    },
+    "auto_score": {
+      "type": "number",
+      "description": "Calculated autonomous score"
+    },
+    "teleop_score": {
+      "type": "number",
+      "description": "Calculated teleop score"
+    },
+    "endgame_score": {
+      "type": "number",
+      "description": "Calculated endgame score"
+    },
+    "total_score": {
+      "type": "number",
+      "description": "Total calculated score"
+    }
+  },
+  "required": [
+    "event_id",
+    "match_number",
+    "team_number",
+    "alliance"
+  ]
+}
