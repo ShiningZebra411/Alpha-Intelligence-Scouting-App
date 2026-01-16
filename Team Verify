@@ -1,0 +1,99 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import { Sparkles, AlertCircle } from 'lucide-react';
+
+const ALLOWED_TEAM = '15337';
+
+export default function TeamVerify() {
+  const [teamNumber, setTeamNumber] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if already verified
+    const verified = localStorage.getItem('ftc_team_verified');
+    if (verified === ALLOWED_TEAM) {
+      navigate(createPageUrl('Home'));
+    }
+  }, [navigate]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (teamNumber === ALLOWED_TEAM) {
+      localStorage.setItem('ftc_team_verified', teamNumber);
+      navigate(createPageUrl('Home'));
+    } else {
+      setError('Access denied. Invalid team number.');
+    }
+  };
+
+  return (
+    <BackgroundWrapper>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 mb-6 backdrop-blur-sm">
+              <Sparkles className="h-4 w-4 text-cyan-400" />
+              <span className="text-zinc-400 text-sm">FTC DECODE 2025-2026</span>
+            </div>
+            
+            <h1 className="text-4xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                FTC Scout
+              </span>
+            </h1>
+            <p className="text-zinc-400">Enter your team number to continue</p>
+          </div>
+
+          <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Input
+                    type="text"
+                    value={teamNumber}
+                    onChange={(e) => {
+                      setTeamNumber(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="Team Number"
+                    className="bg-zinc-800 border-zinc-700 text-white text-center text-xl h-14"
+                    autoFocus
+                  />
+                </div>
+                
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 p-3 rounded-lg"
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    {error}
+                  </motion.div>
+                )}
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold h-12 rounded-xl"
+                >
+                  Continue
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </BackgroundWrapper>
+  );
+}
