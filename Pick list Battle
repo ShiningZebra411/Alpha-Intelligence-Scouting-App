@@ -1,0 +1,254 @@
+import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { motion } from 'framer-motion';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import { ArrowLeft, Brain, Loader2, Swords, Trophy } from 'lucide-react';
+
+export default function PickListBattle() {
+  const [redTeam1, setRedTeam1] = useState('');
+  const [redTeam2, setRedTeam2] = useState('');
+  const [blueTeam1, setBlueTeam1] = useState('');
+  const [blueTeam2, setBlueTeam2] = useState('');
+  const [battleResult, setBattleResult] = useState(null);
+
+  const { data: allMatches = [] } = useQuery({
+    queryKey: ['all-matches'],
+    queryFn: () => base44.entities.MatchScout.list('-created_date', 1000),
+  });
+
+  const getTeamStats = (teamNumber) => {
+    const teamMatches = allMatches.filter(m => m.team_number === parseInt(teamNumber));
+    if (teamMatches.length === 0) return null;
+    
+    return {
+      team_number: parseInt(teamNumber),
+      matches_count: teamMatches.length,
+      avg_score: Math.round(teamMatches.reduce((s, m) => s + (m.total_score || 0), 0) / teamMatches.length),
+      avg_auto: Math.round(teamMatches.reduce((s, m) => s + (m.auto_score || 0), 0) / teamMatches.length),
+      avg_teleop: Math.round(teamMatches.reduce((s, m) => s + (m.teleop_score || 0), 0) / teamMatches.length),
+      avg_endgame: Math.round(teamMatches.reduce((s, m) => s + (m.endgame_score || 0), 0) / teamMatches.length),
+      max_score: Math.max(...teamMatches.map(m => m.total_score || 0)),
+      min_score: Math.min(...teamMatches.map(m => m.total_score || 0)),
+      avg_overall: (teamMatches.reduce((s, m) => s + (m.overall_rating || 5), 0) / teamMatches.length).toFixed(1),
+      avg_reliability: (teamMatches.reduce((s, m) => s + (m.reliability_rating || 5), 0) / teamMatches.length).toFixed(1),
+      notes: teamMatches.filter(m => m.notes).map(m => m.notes).join(' | ')
+    };
+  };
+
+  const battleMutation = useMutation({
+    mutationFn: async () => {
+      const red1Stats = getTeamStats(redTeam1);
+      const red2Stats = getTeamStats(redTeam2);
+      const blue1Stats = getTeamStats(blueTeam1);
+      const blue2Stats = getTeamStats(blueTeam2);
+
+      const prompt = `You are an expert FTC DECODE 2025-2026 alliance battle analyst.
+
+IMPORTANT: Use ALL available data sources:
+1. Our scouted data below (if available)
+2. FTC Scout (ftcscout.org) - search for each team
+3. FTC Stats (ftcstats.org/2026) - OPR/CCWM data
+4. FIRST Events (ftc-events.firstinspires.org) - competition results
+
+RED ALLIANCE:
+Team ${redTeam1}: ${red1Stats ? JSON.stringify(red1Stats) : 'No local data - search external sources'}
+Team ${redTeam2}: ${red2Stats ? JSON.stringify(red2Stats) : 'No local data - search external sources'}
+
+BLUE ALLIANCE:
+Team ${blueTeam1}: ${blue1Stats ? JSON.stringify(blue1Stats) : 'No local data - search external sources'}
+Team ${blueTeam2}: ${blue2Stats ? JSON.stringify(blue2Stats) : 'No local data - search external sources'}
+
+Analyze which alliance would win in a head-to-head match. Consider:
+- Combined scoring potential
+- Autonomous capabilities
+- Teleop efficiency
+- Endgame reliability
+- Team synergy
+- Consistency (high vs low scores)
+- Scouter notes
+
+Return:
+{
+  "winner": "red" or "blue",
+  "confidence": number (1-100),
+  "red_predicted_score": number,
+  "blue_predicted_score": number,
+  "red_analysis": "brief red alliance strengths/weaknesses",
+  "blue_analysis": "brief blue alliance strengths/weaknesses",
+  "deciding_factors": "what would decide this match"
+}`;
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            winner: { type: "string" },
+            confidence: { type: "number" },
+            red_predicted_score: { type: "number" },
+            blue_predicted_score: { type: "number" },
+            red_analysis: { type: "string" },
+            blue_analysis: { type: "string" },
+            deciding_factors: { type: "string" }
+          }
+        }
+      });
+
+      return result;
+    },
+    onSuccess: (data) => {
+      setBattleResult(data);
+    }
+  });
+
+  const canBattle = redTeam1 && redTeam2 && blueTeam1 && blueTeam2;
+
+  return (
+    <BackgroundWrapper>
+      <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <Link to={createPageUrl('AIHub')} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">AI Tools</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 text-center">
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-xl bg-red-500/20 mb-4">
+            <Swords className="h-8 w-8 text-red-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Pick-List Battle Mode</h1>
+          <p className="text-zinc-500">Simulate alliance battles with any teams worldwide</p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Red Alliance */}
+          <Card className="bg-red-950/30 border-red-800/50">
+            <CardHeader>
+              <CardTitle className="text-red-400 flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-red-500" />
+                Red Alliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-red-300 text-sm">Team 1</Label>
+                <Input
+                  placeholder="Enter team number"
+                  value={redTeam1}
+                  onChange={(e) => setRedTeam1(e.target.value.replace(/\D/g, ''))}
+                  className="bg-red-950/50 border-red-800 text-white mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-red-300 text-sm">Team 2</Label>
+                <Input
+                  placeholder="Enter team number"
+                  value={redTeam2}
+                  onChange={(e) => setRedTeam2(e.target.value.replace(/\D/g, ''))}
+                  className="bg-red-950/50 border-red-800 text-white mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Blue Alliance */}
+          <Card className="bg-blue-950/30 border-blue-800/50">
+            <CardHeader>
+              <CardTitle className="text-blue-400 flex items-center gap-2">
+                <div className="h-4 w-4 rounded bg-blue-500" />
+                Blue Alliance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-blue-300 text-sm">Team 1</Label>
+                <Input
+                  placeholder="Enter team number"
+                  value={blueTeam1}
+                  onChange={(e) => setBlueTeam1(e.target.value.replace(/\D/g, ''))}
+                  className="bg-blue-950/50 border-blue-800 text-white mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-blue-300 text-sm">Team 2</Label>
+                <Input
+                  placeholder="Enter team number"
+                  value={blueTeam2}
+                  onChange={(e) => setBlueTeam2(e.target.value.replace(/\D/g, ''))}
+                  className="bg-blue-950/50 border-blue-800 text-white mt-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="text-center mb-8">
+          <Button
+            onClick={() => battleMutation.mutate()}
+            disabled={!canBattle || battleMutation.isPending}
+            className="bg-purple-500 hover:bg-purple-400 text-white px-8 h-12 text-lg"
+          >
+            {battleMutation.isPending ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Simulating Battle...</>
+            ) : (
+              <><Swords className="h-5 w-5 mr-2" />Battle!</>
+            )}
+          </Button>
+        </div>
+
+        {battleResult && (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <Card className={`border-2 ${battleResult.winner === 'red' ? 'bg-red-950/30 border-red-500' : 'bg-blue-950/30 border-blue-500'}`}>
+              <CardContent className="py-8 text-center">
+                <Trophy className={`h-16 w-16 mx-auto mb-4 ${battleResult.winner === 'red' ? 'text-red-400' : 'text-blue-400'}`} />
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  {battleResult.winner === 'red' ? 'Red' : 'Blue'} Alliance Wins!
+                </h2>
+                <p className="text-zinc-400 mb-6">Confidence: {battleResult.confidence}%</p>
+
+                <div className="flex justify-center gap-8 mb-6">
+                  <div className="text-center">
+                    <p className="text-red-400 text-sm mb-1">Red Alliance</p>
+                    <p className="text-4xl font-bold text-red-400">{battleResult.red_predicted_score}</p>
+                  </div>
+                  <div className="text-zinc-600 text-2xl self-center">vs</div>
+                  <div className="text-center">
+                    <p className="text-blue-400 text-sm mb-1">Blue Alliance</p>
+                    <p className="text-4xl font-bold text-blue-400">{battleResult.blue_predicted_score}</p>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4 text-left mb-4">
+                  <div className="bg-red-950/30 rounded-lg p-4">
+                    <h4 className="text-red-400 font-semibold mb-2">Red Analysis</h4>
+                    <p className="text-zinc-300 text-sm">{battleResult.red_analysis}</p>
+                  </div>
+                  <div className="bg-blue-950/30 rounded-lg p-4">
+                    <h4 className="text-blue-400 font-semibold mb-2">Blue Analysis</h4>
+                    <p className="text-zinc-300 text-sm">{battleResult.blue_analysis}</p>
+                  </div>
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-lg p-4">
+                  <h4 className="text-cyan-400 font-semibold mb-2">Deciding Factors</h4>
+                  <p className="text-zinc-300 text-sm">{battleResult.deciding_factors}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </div>
+    </BackgroundWrapper>
+  );
+}
