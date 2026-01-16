@@ -1,0 +1,215 @@
+import React, { useMemo, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, TrendingUp, Target, Gamepad2, Flag, ChevronDown, ChevronUp } from 'lucide-react';
+
+export default function TeamRankings({ matches, isLoading }) {
+  const [expandedTeam, setExpandedTeam] = useState(null);
+
+  const teamStats = useMemo(() => {
+    const stats = {};
+    
+    matches.forEach(match => {
+      const team = match.team_number;
+      if (!stats[team]) {
+        stats[team] = {
+          team_number: team,
+          matches: 0,
+          matchList: [],
+          total_score: 0,
+          auto_score: 0,
+          teleop_score: 0,
+          endgame_score: 0,
+          max_score: 0,
+          defense_avg: 0,
+          driver_avg: 0
+        };
+      }
+      
+      stats[team].matches += 1;
+      stats[team].matchList.push(match);
+      stats[team].total_score += match.total_score || 0;
+      stats[team].auto_score += match.auto_score || 0;
+      stats[team].teleop_score += match.teleop_score || 0;
+      stats[team].endgame_score += match.endgame_score || 0;
+      stats[team].max_score = Math.max(stats[team].max_score, match.total_score || 0);
+      stats[team].min_score = stats[team].min_score === undefined 
+        ? (match.total_score || 0) 
+        : Math.min(stats[team].min_score, match.total_score || 0);
+      stats[team].defense_avg += match.defense_rating || 0;
+      stats[team].driver_avg += match.driver_skill || 0;
+    });
+
+    return Object.values(stats)
+      .map(team => ({
+        ...team,
+        avg_score: team.matches ? Math.round(team.total_score / team.matches) : 0,
+        avg_auto: team.matches ? Math.round(team.auto_score / team.matches) : 0,
+        avg_teleop: team.matches ? Math.round(team.teleop_score / team.matches) : 0,
+        avg_endgame: team.matches ? Math.round(team.endgame_score / team.matches) : 0,
+        defense_avg: team.matches ? (team.defense_avg / team.matches).toFixed(1) : 0,
+        driver_avg: team.matches ? (team.driver_avg / team.matches).toFixed(1) : 0,
+        min_score: team.min_score || 0
+      }))
+      .sort((a, b) => b.avg_score - a.avg_score);
+  }, [matches]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 bg-zinc-900 rounded-xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (teamStats.length === 0) {
+    return (
+      <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+        <CardContent className="py-12 text-center">
+          <Target className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+          <p className="text-zinc-400">No team data yet</p>
+          <p className="text-zinc-600 text-sm">Start scouting matches to see rankings</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {teamStats.map((team, index) => (
+        <motion.div
+          key={team.team_number}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.05 }}
+        >
+          <Card className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors overflow-hidden backdrop-blur-sm">
+            <CardContent className="p-0">
+              <div 
+                className="flex items-stretch cursor-pointer"
+                onClick={() => setExpandedTeam(expandedTeam === team.team_number ? null : team.team_number)}
+              >
+                {/* Rank */}
+                <div className={`w-16 flex items-center justify-center ${
+                  index === 0 ? 'bg-amber-500/20' : 
+                  index === 1 ? 'bg-zinc-400/20' : 
+                  index === 2 ? 'bg-orange-600/20' : 'bg-zinc-800/50'
+                }`}>
+                  <span className={`text-2xl font-bold ${
+                    index === 0 ? 'text-amber-400' : 
+                    index === 1 ? 'text-zinc-300' : 
+                    index === 2 ? 'text-orange-400' : 'text-zinc-500'
+                  }`}>
+                    #{index + 1}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl font-bold text-white">Team {team.team_number}</span>
+                      <Badge variant="secondary" className="bg-zinc-800 text-zinc-400">
+                        {team.matches} {team.matches === 1 ? 'match' : 'matches'}
+                      </Badge>
+                      {expandedTeam === team.team_number ? (
+                        <ChevronUp className="h-4 w-4 text-zinc-500" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-zinc-500" />
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-cyan-400">{team.avg_score}</p>
+                      <p className="text-zinc-500 text-xs">Avg Score</p>
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown */}
+                  <div className="grid grid-cols-5 gap-3">
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
+                        <Trophy className="h-3 w-3" />
+                        Auto
+                      </div>
+                      <p className="text-white font-semibold">{team.avg_auto}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
+                        <Gamepad2 className="h-3 w-3" />
+                        Teleop
+                      </div>
+                      <p className="text-white font-semibold">{team.avg_teleop}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
+                        <Flag className="h-3 w-3" />
+                        Endgame
+                      </div>
+                      <p className="text-white font-semibold">{team.avg_endgame}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Max
+                      </div>
+                      <p className="text-white font-semibold">{team.max_score}</p>
+                    </div>
+                    <div className="bg-zinc-800/50 rounded-lg p-2">
+                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
+                        <TrendingUp className="h-3 w-3 rotate-180" />
+                        Min
+                      </div>
+                      <p className="text-white font-semibold">{team.min_score}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded Match History */}
+              <AnimatePresence>
+                {expandedTeam === team.team_number && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t border-zinc-800 overflow-hidden"
+                  >
+                    <div className="p-4 bg-zinc-800/30">
+                      <h4 className="text-zinc-400 text-sm font-medium mb-3">Match History</h4>
+                      <div className="space-y-2">
+                        {team.matchList.sort((a, b) => b.match_number - a.match_number).map(match => (
+                          <div 
+                            key={match.id} 
+                            className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                                match.alliance === 'red' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                              }`}>
+                                M{match.match_number}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                <span>A:{match.auto_score || 0}</span>
+                                <span>T:{match.teleop_score || 0}</span>
+                                <span>E:{match.endgame_score || 0}</span>
+                              </div>
+                            </div>
+                            <span className="text-cyan-400 font-bold">{match.total_score || 0}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
