@@ -1,0 +1,95 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { motion } from 'framer-motion';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowLeft, Brain, Trophy, Swords, Users, Zap } from 'lucide-react';
+
+const AIFeatureCard = ({ icon: Icon, title, description, href, color, delay }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay }}
+  >
+    <Link to={href}>
+      <Card className="bg-zinc-900/50 border-zinc-800 hover:border-purple-500/50 transition-all duration-300 group backdrop-blur-sm cursor-pointer h-full">
+        <CardContent className="p-6">
+          <div className={`h-14 w-14 rounded-xl ${color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+            <Icon className="h-7 w-7 text-white" />
+          </div>
+          <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+          <p className="text-zinc-400 text-sm leading-relaxed">{description}</p>
+        </CardContent>
+      </Card>
+    </Link>
+  </motion.div>
+);
+
+export default function AIHub() {
+  const features = [
+    {
+      icon: Trophy,
+      title: "AI Rankings",
+      description: "Get AI-powered team rankings based on scouted data, FTC Scout, FTC Stats, and official FIRST events.",
+      href: createPageUrl('AIRankings'),
+      color: "bg-purple-500"
+    },
+    {
+      icon: Zap,
+      title: "Predicted Match Outcome",
+      description: "AI predicts match winners based on schedule, team stats, and historical performance. Updates after each match.",
+      href: createPageUrl('PredictedMatchOutcome'),
+      color: "bg-amber-500"
+    },
+    {
+      icon: Swords,
+      title: "Pick-List Battle Mode",
+      description: "Simulate alliance battles! Choose any 4 teams, put them on red/blue alliances, and see AI predict the winner.",
+      href: createPageUrl('PickListBattle'),
+      color: "bg-red-500"
+    },
+    {
+      icon: Users,
+      title: "Fast Pick-List Decisions",
+      description: "Enter a team number and AI finds the top 10 most compatible partner teams for alliance selection.",
+      href: createPageUrl('FastPickList'),
+      color: "bg-cyan-500"
+    }
+  ];
+
+  return (
+    <BackgroundWrapper>
+      <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <Link to={createPageUrl('Home')} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Home</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          className="text-center mb-12"
+        >
+          <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-purple-500/20 mb-6">
+            <Brain className="h-10 w-10 text-purple-400" />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-4">AI Tools</h1>
+          <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+            Powerful AI-driven analysis tools to help you make smarter scouting decisions
+          </p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {features.map((feature, index) => (
+            <AIFeatureCard key={feature.title} {...feature} delay={0.1 * index} />
+          ))}
+        </div>
+      </div>
+    </BackgroundWrapper>
+  );
+}
