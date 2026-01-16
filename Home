@@ -1,0 +1,209 @@
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { motion } from 'framer-motion';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import { 
+  Trophy, 
+  Users, 
+  BarChart3, 
+  ClipboardList, 
+  ChevronRight,
+  Sparkles,
+  Search,
+  Calendar,
+  Brain
+} from 'lucide-react';
+
+const FeatureCard = ({ icon: Icon, title, description, delay }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay }}
+  >
+    <Card className="bg-zinc-900/50 border-zinc-800 hover:border-cyan-500/50 transition-all duration-300 group backdrop-blur-sm">
+      <CardContent className="p-6">
+        <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 transition-colors">
+          <Icon className="h-6 w-6 text-cyan-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+        <p className="text-zinc-400 text-sm leading-relaxed">{description}</p>
+      </CardContent>
+    </Card>
+  </motion.div>
+);
+
+export default function Home() {
+  const navigate = useNavigate();
+  const [showEventPicker, setShowEventPicker] = useState(false);
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => base44.entities.Event.list('-created_date'),
+  });
+
+  useEffect(() => {
+    const verified = localStorage.getItem('ftc_team_verified');
+    if (verified !== '15337') {
+      navigate(createPageUrl('TeamVerify'));
+    }
+  }, [navigate]);
+
+  const features = [
+    {
+      icon: Trophy,
+      title: "Real-time Scoring",
+      description: "Track autonomous, teleop, and endgame performance with live point calculations."
+    },
+    {
+      icon: Users,
+      title: "Team Collaboration",
+      description: "Share scouting data across your entire team with secure, role-based access."
+    },
+    {
+      icon: BarChart3,
+      title: "Advanced Analytics",
+      description: "Generate insights with team rankings, performance trends, and match analysis."
+    }
+  ];
+
+  return (
+    <BackgroundWrapper>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-cyan-500/10 rounded-full blur-3xl opacity-20" />
+        
+        <div className="relative max-w-6xl mx-auto px-4 pt-20 pb-16">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900/80 border border-zinc-800 mb-8 backdrop-blur-sm">
+              <Sparkles className="h-4 w-4 text-cyan-400" />
+              <span className="text-zinc-400 text-sm">FTC DECODE 2025-2026</span>
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                FTC Scout
+              </span>
+            </h1>
+            
+            <p className="text-xl text-zinc-400 mb-10 max-w-2xl mx-auto">
+              Professional scouting made simple. Track, analyze, and dominate your competition.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
+              <Link to={createPageUrl('Events')}>
+                <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-8 h-12 rounded-xl">
+                  <Calendar className="mr-2 h-5 w-5" />
+                  Your Events
+                </Button>
+              </Link>
+              <Link to={createPageUrl('FTCScoutSearch')}>
+                <Button size="lg" variant="outline" className="border-purple-500 text-purple-400 hover:bg-purple-500/10 font-semibold px-8 h-12 rounded-xl">
+                  <Search className="mr-2 h-5 w-5" />
+                  FTC Scout Search
+                </Button>
+              </Link>
+              <Link to={createPageUrl('AIHub')}>
+                <Button size="lg" variant="outline" className="border-amber-500 text-amber-400 hover:bg-amber-500/10 font-semibold px-8 h-12 rounded-xl">
+                  <Brain className="mr-2 h-5 w-5" />
+                  AI
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="grid md:grid-cols-3 gap-6">
+          {features.map((feature, index) => (
+            <FeatureCard key={feature.title} {...feature} delay={0.1 * index} />
+          ))}
+        </div>
+      </div>
+
+      {/* See It In Action */}
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-4">
+            See It In Action
+          </h2>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div 
+            onClick={() => setShowEventPicker(true)}
+            className="cursor-pointer flex flex-col items-center text-center p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-zinc-700 transition-all backdrop-blur-sm"
+          >
+            <div className="h-16 w-16 rounded-2xl bg-zinc-800 flex items-center justify-center mb-4">
+              <ClipboardList className="h-8 w-8 text-cyan-400" />
+            </div>
+            <h4 className="text-white font-medium mb-2">Scout Matches</h4>
+            <p className="text-zinc-500 text-sm">Intuitive forms for quick data entry during matches</p>
+          </div>
+          <Link to={createPageUrl('TeamAnalytics')}>
+            <div className="cursor-pointer flex flex-col items-center text-center p-6 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-zinc-700 transition-all backdrop-blur-sm">
+              <div className="h-16 w-16 rounded-2xl bg-zinc-800 flex items-center justify-center mb-4">
+                <BarChart3 className="h-8 w-8 text-cyan-400" />
+              </div>
+              <h4 className="text-white font-medium mb-2">View Analytics</h4>
+              <p className="text-zinc-500 text-sm">Real-time team rankings and performance metrics</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Event Picker Dialog */}
+      <Dialog open={showEventPicker} onOpenChange={setShowEventPicker}>
+        <DialogContent className="bg-zinc-900 border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Select Event to Scout</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 mt-4">
+            {events.length === 0 ? (
+              <p className="text-zinc-400 text-center py-4">No events created yet. Create one in Your Events.</p>
+            ) : (
+              events.map(event => (
+                <Link 
+                  key={event.id} 
+                  to={createPageUrl('ScoutMatch') + `?eventId=${event.id}`}
+                  onClick={() => setShowEventPicker(false)}
+                >
+                  <div className="p-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors">
+                    <h4 className="text-white font-medium">{event.name}</h4>
+                    {event.location && <p className="text-zinc-500 text-sm">{event.location}</p>}
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-900 py-8">
+        <div className="max-w-6xl mx-auto px-4 text-center">
+          <p className="text-zinc-600 text-sm">
+            Built for FTC teams • Professional scouting solution
+          </p>
+        </div>
+      </footer>
+    </BackgroundWrapper>
+  );
+}
