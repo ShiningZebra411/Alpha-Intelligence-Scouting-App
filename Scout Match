@@ -1,0 +1,591 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { motion } from 'framer-motion';
+import BackgroundWrapper from '@/components/BackgroundWrapper';
+import AutoPathDrawer from '@/components/scouting/AutoPathDrawer';
+import { ArrowLeft, Save, Minus, Plus, Trophy, Gamepad2, Flag, Star } from 'lucide-react';
+
+// FTC DECODE Correct Scoring Values
+const SCORING = {
+  // Autonomous
+  auto_leave: 3,
+  auto_artifact_scored: 3,
+  auto_artifact_overflow: 1,
+  auto_pattern: 2,
+  // Teleop
+  teleop_artifact_scored: 3,
+  teleop_artifact_overflow: 1,
+  teleop_depot_artifact: 1,
+  teleop_pattern: 2,
+  // Endgame
+  endgame_fully_in_base: 10,
+  endgame_partially_in_base: 5,
+};
+
+export default function ScoutMatch() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const eventId = urlParams.get('eventId');
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [formData, setFormData] = useState({
+    match_number: '',
+    team_number: '',
+    alliance: 'red',
+    // Autonomous
+    auto_leave: false,
+    auto_artifacts_scored: 0,
+    auto_artifacts_overflow: 0,
+    auto_patterns: 0,
+    auto_path: '',
+    // Teleop
+    teleop_artifacts_scored: 0,
+    teleop_artifacts_overflow: 0,
+    teleop_depot_artifacts: 0,
+    teleop_patterns: 0,
+    teleop_cycles: 0,
+    // Endgame
+    endgame_fully_in_base: false,
+    endgame_partially_in_base: false,
+    endgame_top_bot: 'normal',
+    // Ratings
+    defense_rating: 3,
+    driver_skill: 3,
+    notes: '',
+    overall_rating: 50,
+    reliability_rating: 50
+  });
+
+  const [pathColor, setPathColor] = useState('#22d3ee');
+  const [allianceFullError, setAllianceFullError] = useState('');
+
+  const calculateScores = () => {
+    const autoScore = 
+      (formData.auto_leave ? SCORING.auto_leave : 0) +
+      (formData.auto_artifacts_scored * SCORING.auto_artifact_scored) +
+      (formData.auto_artifacts_overflow * SCORING.auto_artifact_overflow) +
+      (formData.auto_patterns * SCORING.auto_pattern);
+
+    const teleopScore = 
+      (formData.teleop_artifacts_scored * SCORING.teleop_artifact_scored) +
+      (formData.teleop_artifacts_overflow * SCORING.teleop_artifact_overflow) +
+      (formData.teleop_depot_artifacts * SCORING.teleop_depot_artifact) +
+      (formData.teleop_patterns * SCORING.teleop_pattern);
+
+    const endgameScore = 
+      (formData.endgame_fully_in_base ? SCORING.endgame_fully_in_base : 0) +
+      (formData.endgame_partially_in_base && !formData.endgame_fully_in_base ? SCORING.endgame_partially_in_base : 0);
+
+    return { autoScore, teleopScore, endgameScore, totalScore: autoScore + teleopScore + endgameScore };
+  };
+
+  const scores = calculateScores();
+
+  const { data: existingMatches = [] } = useQuery({
+    queryKey: ['matches', eventId],
+    queryFn: () => base44.entities.MatchScout.filter({ event_id: eventId }),
+    enabled: !!eventId,
+  });
+
+  const createMatchMutation = useMutation({
+    mutationFn: (data) => base44.entities.MatchScout.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches', eventId] });
+      navigate(createPageUrl('EventDashboard') + `?eventId=${eventId}`);
+    },
+  });
+
+  const checkAllianceSlots = () => {
+    const matchNum = parseInt(formData.match_number);
+    const alliance = formData.alliance;
+    
+    if (!matchNum) return true;
+    
+    const sameMatchAlliance = existingMatches.filter(
+      m => m.match_number === matchNum && m.alliance === alliance
+    );
+    
+    if (sameMatchAlliance.length >= 2) {
+      setAllianceFullError(`Match ${matchNum} ${alliance} alliance is full (2 teams max)`);
+      return false;
+    }
+    
+    setAllianceFullError('');
+    return true;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (!checkAllianceSlots()) {
+      return;
+    }
+    
+    const scores = calculateScores();
+    createMatchMutation.mutate({
+      ...formData,
+      event_id: eventId,
+      match_number: parseInt(formData.match_number),
+      team_number: parseInt(formData.team_number),
+      auto_score: scores.autoScore,
+      teleop_score: scores.teleopScore,
+      endgame_score: scores.endgameScore,
+      total_score: scores.totalScore
+    });
+  };
+
+  const updateCount = (field, delta, max = Infinity) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: Math.min(max, Math.max(0, (prev[field] || 0) + delta))
+    }));
+  };
+
+  return (
+    <BackgroundWrapper>
+      <div className="pb-32">
+        {/* Header */}
+        <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50">
+          <div className="max-w-2xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Link 
+                to={createPageUrl('EventDashboard') + `?eventId=${eventId}`} 
+                className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="text-sm">Back</span>
+              </Link>
+              <div className="text-right">
+                <p className="text-cyan-400 font-bold text-lg">{scores.totalScore}</p>
+                <p className="text-zinc-500 text-xs">Total Points</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <h1 className="text-2xl font-bold text-white mb-2">Scout Match</h1>
+            <p className="text-zinc-500">Record match performance data</p>
+          </motion.div>
+
+          {/* Match Info */}
+          <Card className="bg-zinc-900/50 border-zinc-800 mb-6 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-base">Match Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-zinc-400 text-sm">Match #</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formData.match_number}
+                    onChange={(e) => setFormData({ ...formData, match_number: e.target.value.replace(/\D/g, '') })}
+                    className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                    placeholder="1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label className="text-zinc-400 text-sm">Team #</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formData.team_number}
+                    onChange={(e) => setFormData({ ...formData, team_number: e.target.value.replace(/\D/g, '') })}
+                    className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                    placeholder="16312"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-zinc-400 text-sm mb-2 block">Alliance</Label>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, alliance: 'red' })}
+                    className={`flex-1 ${formData.alliance === 'red' 
+                      ? 'bg-red-500 hover:bg-red-400 text-white' 
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}
+                  >
+                    Red Alliance
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, alliance: 'blue' })}
+                    className={`flex-1 ${formData.alliance === 'blue' 
+                      ? 'bg-blue-500 hover:bg-blue-400 text-white' 
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}
+                  >
+                    Blue Alliance
+                  </Button>
+                </div>
+              </div>
+              {allianceFullError && (
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50">
+                  <p className="text-red-400 text-sm font-medium">{allianceFullError}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scoring Tabs */}
+          <Tabs defaultValue="auto" className="space-y-4">
+            <TabsList className="bg-zinc-900/80 border border-zinc-800 p-1 rounded-xl w-full grid grid-cols-3 backdrop-blur-sm">
+              <TabsTrigger 
+                value="auto" 
+                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-black rounded-lg text-sm"
+              >
+                <Trophy className="h-4 w-4 mr-1.5" />
+                Auto ({scores.autoScore})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="teleop" 
+                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-black rounded-lg text-sm"
+              >
+                <Gamepad2 className="h-4 w-4 mr-1.5" />
+                Teleop ({scores.teleopScore})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="endgame" 
+                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-black rounded-lg text-sm"
+              >
+                <Flag className="h-4 w-4 mr-1.5" />
+                End ({scores.endgameScore})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Autonomous Tab */}
+            <TabsContent value="auto">
+              <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-white text-base">Autonomous Period (30 sec)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <div>
+                      <Label className="text-zinc-300">Left Starting Area</Label>
+                      <p className="text-zinc-500 text-xs">+{SCORING.auto_leave} pts</p>
+                    </div>
+                    <Switch
+                      checked={formData.auto_leave}
+                      onCheckedChange={(v) => setFormData({ ...formData, auto_leave: v })}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <CounterField 
+                      label={`Artifacts Classified (+${SCORING.auto_artifact_scored}pts ea)`} 
+                      value={formData.auto_artifacts_scored} 
+                      onChange={(v) => updateCount('auto_artifacts_scored', v)} 
+                    />
+                    <CounterField 
+                      label={`Overflow (+${SCORING.auto_artifact_overflow}pt ea)`} 
+                      value={formData.auto_artifacts_overflow} 
+                      onChange={(v) => updateCount('auto_artifacts_overflow', v)} 
+                    />
+                  </div>
+
+                  <CounterField 
+                    label={`Pattern Matches / MOTIF (+${SCORING.auto_pattern}pts ea)`} 
+                    value={formData.auto_patterns} 
+                    onChange={(v) => updateCount('auto_patterns', v)}
+                    max={9}
+                  />
+
+                  {/* Path Color Selector */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-zinc-400 text-xs">Path Color:</span>
+                    {['#22d3ee', '#22c55e', '#ef4444', '#f59e0b', '#a855f7'].map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setPathColor(color)}
+                        className={`h-6 w-6 rounded-full border-2 ${pathColor === color ? 'border-white' : 'border-transparent'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Auto Path Drawer */}
+                  <AutoPathDrawer 
+                    value={formData.auto_path}
+                    onChange={(path) => setFormData({ ...formData, auto_path: path })}
+                    pathColor={pathColor}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Teleop Tab */}
+            <TabsContent value="teleop">
+              <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-white text-base">Teleop Period (2 min)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <CounterField 
+                      label={`Artifacts Classified (+${SCORING.teleop_artifact_scored}pts ea)`} 
+                      value={formData.teleop_artifacts_scored} 
+                      onChange={(v) => updateCount('teleop_artifacts_scored', v)} 
+                    />
+                    <CounterField 
+                      label={`Overflow (+${SCORING.teleop_artifact_overflow}pt ea)`} 
+                      value={formData.teleop_artifacts_overflow} 
+                      onChange={(v) => updateCount('teleop_artifacts_overflow', v)} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <CounterField 
+                      label={`Depot Artifacts (+${SCORING.teleop_depot_artifact}pt ea)`} 
+                      value={formData.teleop_depot_artifacts} 
+                      onChange={(v) => updateCount('teleop_depot_artifacts', v)} 
+                    />
+                    <CounterField 
+                      label={`Patterns / MOTIF (+${SCORING.teleop_pattern}pts ea)`} 
+                      value={formData.teleop_patterns} 
+                      onChange={(v) => updateCount('teleop_patterns', v)}
+                      max={9}
+                    />
+                  </div>
+
+                  <CounterField 
+                    label="Cycles Completed (tracking)" 
+                    value={formData.teleop_cycles} 
+                    onChange={(v) => updateCount('teleop_cycles', v)} 
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Endgame Tab */}
+            <TabsContent value="endgame">
+              <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-white text-base">Endgame (last 30 sec)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <div>
+                      <Label className="text-zinc-300">Fully in Base</Label>
+                      <p className="text-zinc-500 text-xs">+{SCORING.endgame_fully_in_base} pts</p>
+                    </div>
+                    <Switch
+                      checked={formData.endgame_fully_in_base}
+                      onCheckedChange={(v) => setFormData({ ...formData, endgame_fully_in_base: v, endgame_partially_in_base: v ? false : formData.endgame_partially_in_base })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <div>
+                      <Label className="text-zinc-300">Partially in Base</Label>
+                      <p className="text-zinc-500 text-xs">+{SCORING.endgame_partially_in_base} pts (if not fully)</p>
+                    </div>
+                    <Switch
+                      checked={formData.endgame_partially_in_base}
+                      disabled={formData.endgame_fully_in_base}
+                      onCheckedChange={(v) => setFormData({ ...formData, endgame_partially_in_base: v })}
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
+                    <Label className="text-zinc-300 mb-2 block">Top/Bot Position</Label>
+                    <div className="flex gap-2">
+                      {[
+                          { value: 'normal', label: 'Normal' },
+                          { value: 'top_bot', label: 'Top Bot' },
+                          { value: 'half_space', label: 'Half Space' }
+                        ].map(pos => (
+                        <Button
+                          key={pos.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, endgame_top_bot: pos.value })}
+                          className={`flex-1 ${formData.endgame_top_bot === pos.value 
+                            ? 'bg-cyan-500 hover:bg-cyan-400 text-black' 
+                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400'}`}
+                        >
+                          {pos.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Ratings */}
+          <Card className="bg-zinc-900/50 border-zinc-800 mt-6 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-base">Performance Ratings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-zinc-400 text-sm">Defense Rating</Label>
+                  <span className="text-cyan-400 font-medium">{formData.defense_rating}/5</span>
+                </div>
+                <Slider
+                  value={[formData.defense_rating]}
+                  onValueChange={([v]) => setFormData({ ...formData, defense_rating: v })}
+                  min={1}
+                  max={5}
+                  step={1}
+                  className="py-2 [&_[role=slider]]:bg-blue-500 [&_[data-orientation=horizontal]>.bg-primary]:bg-blue-500"
+                />
+              </div>
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-zinc-400 text-sm">Driver Skill</Label>
+                  <span className="text-cyan-400 font-medium">{formData.driver_skill}/5</span>
+                </div>
+                <Slider
+                  value={[formData.driver_skill]}
+                  onValueChange={([v]) => setFormData({ ...formData, driver_skill: v })}
+                  min={1}
+                  max={5}
+                  step={1}
+                  className="py-2 [&_[role=slider]]:bg-blue-500 [&_[data-orientation=horizontal]>.bg-primary]:bg-blue-500"
+                />
+              </div>
+              <div>
+                <Label className="text-zinc-400 text-sm">Notes</Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white mt-1.5"
+                  placeholder="Additional observations..."
+                  rows={3}
+                />
+              </div>
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-zinc-400 text-sm">Overall Rating</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.overall_rating}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                        setFormData({ ...formData, overall_rating: Math.min(100, Math.max(0, val)) });
+                      }}
+                      className="w-16 h-8 bg-zinc-800 border-zinc-700 text-white text-center p-1"
+                    />
+                    <span className="text-cyan-400 font-medium">/100</span>
+                  </div>
+                </div>
+                <Slider
+                  value={[formData.overall_rating]}
+                  onValueChange={([v]) => setFormData({ ...formData, overall_rating: v })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="py-2 [&_[role=slider]]:bg-amber-500 [&_[data-orientation=horizontal]>.bg-primary]:bg-amber-500"
+                />
+                <p className="text-zinc-500 text-xs mt-1">Slide or type 0-100</p>
+              </div>
+              <div>
+                <div className="flex justify-between mb-2">
+                  <Label className="text-zinc-400 text-sm">Reliability</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.reliability_rating}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+                        setFormData({ ...formData, reliability_rating: Math.min(100, Math.max(0, val)) });
+                      }}
+                      className="w-16 h-8 bg-zinc-800 border-zinc-700 text-white text-center p-1"
+                    />
+                    <span className="text-cyan-400 font-medium">/100</span>
+                  </div>
+                </div>
+                <Slider
+                  value={[formData.reliability_rating]}
+                  onValueChange={([v]) => setFormData({ ...formData, reliability_rating: v })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="py-2 [&_[role=slider]]:bg-green-500 [&_[data-orientation=horizontal]>.bg-primary]:bg-green-500"
+                />
+                <p className="text-zinc-500 text-xs mt-1">Slide or type 0-100</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submit Button */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent">
+            <div className="max-w-2xl mx-auto">
+              <Button 
+                type="submit" 
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold h-14 rounded-xl text-lg"
+                disabled={createMatchMutation.isPending}
+              >
+                {createMatchMutation.isPending ? 'Saving...' : (
+                  <>
+                    <Save className="h-5 w-5 mr-2" />
+                    Save Match ({scores.totalScore} pts)
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </BackgroundWrapper>
+  );
+}
+
+function CounterField({ label, value, onChange, max = Infinity }) {
+  return (
+    <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
+      <Label className="text-zinc-400 text-xs block mb-2">{label}{max < Infinity && ` (max ${max})`}</Label>
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => onChange(-1, max)}
+          className="h-10 w-10 rounded-xl border-zinc-600 bg-zinc-800 hover:bg-zinc-700 text-white"
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <span className="text-2xl font-bold text-white tabular-nums">{value}</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => onChange(1, max)}
+          disabled={value >= max}
+          className="h-10 w-10 rounded-xl border-zinc-600 bg-zinc-800 hover:bg-zinc-700 text-white disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
